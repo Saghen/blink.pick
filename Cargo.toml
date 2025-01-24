@@ -1,0 +1,10 @@
+[package]
+name = "blink_pick"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+nvim-oxi = { version = "0.5.1", features = ["neovim-nightly"] }
