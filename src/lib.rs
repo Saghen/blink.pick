@@ -1,65 +1,45 @@
-use nvim_oxi::api::{self, Window, opts::*, types::*};
-use nvim_oxi::{Dictionary, Function, print};
+use layout::Layout;
+use nvim_oxi::api;
+use nvim_oxi::{Dictionary, Function};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 mod layout;
+mod view;
 
 #[nvim_oxi::plugin]
 fn blink_pick() -> nvim_oxi::Result<Dictionary> {
-    // Create a new `Greetings` command.
-    let opts = CreateCommandOpts::builder()
-        .bang(true)
-        .desc("shows a greetings message")
-        .nargs(CommandNArgs::ZeroOrOne)
-        .build();
+    let layout: Rc<RefCell<Option<Layout>>> = Rc::default();
 
-    let greetings = |args: CommandArgs| {
-        let who = args.args.unwrap_or("from Rust".to_owned());
-        let bang = if args.bang { "!" } else { "" };
-        print!("Hello {}{}", who, bang);
-    };
+    let layout_rc = Rc::clone(&layout);
 
-    api::create_user_command("BlinkPick", greetings, &opts)?;
-
-    // Remaps `hi` to `hello` in insert mode.
-    api::set_keymap(Mode::Insert, "hi", "hello", &Default::default())?;
-
-    // Creates two functions `{open,close}_window` to open and close a
-    // floating window.
-
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    let win: Rc<RefCell<Option<Window>>> = Rc::default();
-
-    let w = Rc::clone(&win);
-
-    let open_window: Function<(), Result<(), api::Error>> = Function::from_fn(move |()| {
-        if w.borrow().is_some() {
-            api::err_writeln("Window is already open");
-            return Ok(());
+    let open_window = Function::from_fn(move |()| {
+        if layout_rc.borrow().is_none() {
+            match Layout::new(api::get_current_win()) {
+                Ok(layout) => {
+                    *layout_rc.borrow_mut() = Some(layout);
+                }
+                Err(err) => {
+                    api::err_writeln(&format!("Failed to create layout: {err}"));
+                    return;
+                }
+            }
         }
 
-        let config = WindowConfig::builder()
-            .height(20)
-            .split(SplitDirection::Below)
-            .build();
-
-        let mut win = w.borrow_mut();
-        let buf = api::create_buf(false, true)?;
-
-        *win = Some(api::open_win(&buf, true, &config)?);
-
-        Ok(())
+        if let Err(err) = layout_rc.borrow_mut().as_mut().unwrap().open() {
+            api::err_writeln(&format!("Failed to open window: {err}"));
+        }
     });
 
     let close_window = Function::from_fn(move |()| {
-        if win.borrow().is_none() {
+        if layout.borrow().is_none() {
             api::err_writeln("Window is already closed");
-            return Ok(());
+            return;
         }
 
-        let win = win.borrow_mut().take().unwrap();
-        win.close(false)
+        if let Err(err) = layout.borrow_mut().as_mut().unwrap().close(false) {
+            api::err_writeln(&format!("Failed to close window: {err}"));
+        }
     });
 
     let api = Dictionary::from_iter([("open_window", open_window), ("close_window", close_window)]);

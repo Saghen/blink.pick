@@ -1,4 +1,4 @@
-> [!WARN]
+> [!WARNING]
 > Not ready for use
 
 # Blink Picker (blink.pick)

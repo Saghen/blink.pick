@@ -7,4 +7,4 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-nvim-oxi = { version = "0.5.1", features = ["neovim-nightly"] }
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["neovim-nightly"] }
