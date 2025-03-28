@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
-use nvim_oxi::{Result, api::Buffer, libuv::AsyncHandle};
-use tokio::sync::{mpsc::UnboundedSender, oneshot};
+use nvim_oxi::{Result, api::Buffer};
 
 #[allow(dead_code)]
 pub trait ListItem {
@@ -11,14 +8,9 @@ pub trait ListItem {
 
 #[allow(dead_code)]
 pub trait List {
-    type Item: ListItem + Sync + Send;
+    type Item: ListItem;
 
-    fn items(
-        &mut self,
-        prompt: String,
-        handle: AsyncHandle,
-        sender: UnboundedSender<Self::Item>,
-    ) -> Result<()>;
+    fn items(&mut self, prompt: String) -> Result<Vec<Self::Item>>;
     fn preview(&self, item: &Self::Item) -> Result<()>;
     fn select(&self, item: &Self::Item) -> Result<()>;
 }

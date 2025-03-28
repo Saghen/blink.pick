@@ -1,6 +1,6 @@
 use nvim_oxi::api;
 use nvim_oxi::{Dictionary, Function};
-use pickers::test::TestPicker;
+use pickers::FilePicker;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Mutex;
@@ -13,19 +13,19 @@ use picker::Picker;
 
 #[nvim_oxi::plugin]
 fn blink_pick() -> nvim_oxi::Result<Dictionary> {
-    let picker: Rc<RefCell<Option<Picker<TestPicker>>>> = Rc::default();
+    let picker: Rc<RefCell<Option<Picker<FilePicker>>>> = Rc::default();
 
     let picker_rc = Rc::clone(&picker);
 
     let open_window = Function::from_fn(move |()| {
-        if picker_rc.borrow().is_none() {
-            match Picker::new(Rc::new(Mutex::new(TestPicker::new()))) {
-                Ok(picker) => {
-                    *picker_rc.borrow_mut() = Some(picker);
-                }
-                Err(err) => {
-                    api::err_writeln(&format!("Failed to create layout: {err}"));
-                }
+        let mut picker_ref = picker_rc.borrow_mut();
+
+        match Picker::new(Rc::new(Mutex::new(FilePicker::new()))) {
+            Ok(picker) => {
+                *picker_ref = Some(picker);
+            }
+            Err(err) => {
+                api::err_writeln(&format!("Failed to create layout: {err}"));
             }
         }
     });

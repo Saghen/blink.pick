@@ -1,18 +1,18 @@
 use std::{
     rc::Rc,
     sync::{Arc, Mutex},
+    time::Instant,
 };
 
+use frizbee::Options;
 use nvim_oxi::{
-    Array, Result,
+    Result,
     api::{
         self, Buffer, Window,
         opts::{BufDeleteOpts, CreateAutocmdOpts, OptionOpts, OptionScope},
         types::{AutocmdCallbackArgs, SplitDirection, WindowConfig},
     },
-    libuv::AsyncHandle,
 };
-use tokio::sync::mpsc;
 
 use crate::list::{List as ListTrait, ListItem};
 
@@ -86,7 +86,9 @@ impl<List: ListTrait> Picker<List> {
         let input_listener = CreateAutocmdOpts::builder()
             .buffer(win.get_buf()?)
             .callback(move |args: AutocmdCallbackArgs| -> Result<bool> {
-                let input = args
+                let time = Instant::now();
+
+                let prompt = args
                     .buffer
                     .get_lines(0..1, true)?
                     .next()
@@ -96,20 +98,37 @@ impl<List: ListTrait> Picker<List> {
 
                 // TODO: don't run if input didn't change
 
-                let (sender, mut receiver) = mpsc::unbounded_channel::<List::Item>();
+                let items = list
+                    .lock()
+                    .unwrap()
+                    .items(prompt.clone())?
+                    .iter()
+                    .map(|item| item.text())
+                    .collect::<Vec<String>>();
 
-                let handle = AsyncHandle::new(move || {
-                    let item = receiver.blocking_recv().unwrap();
-                    let item_2 = receiver.blocking_recv().unwrap();
-                    let item_3 = receiver.blocking_recv().unwrap();
-                    nvim_oxi::schedule(move |_| {
-                        nvim_oxi::print!("Received item {} from backround thread", item.text());
-                        nvim_oxi::print!("Received item {} from backround thread", item_2.text());
-                        nvim_oxi::print!("Received item {} from backround thread", item_3.text());
-                    });
-                })?;
+                let items_text = items
+                    .iter()
+                    .map(|item| item.as_str())
+                    .collect::<Vec<&str>>();
 
-                let _ = list.lock().unwrap().items(input, handle, sender);
+                let matches = frizbee::match_list(
+                    &prompt,
+                    &items_text,
+                    Options {
+                        max_typos: Some(0),
+                        ..Default::default()
+                    },
+                );
+
+                let matched_items = matches
+                    .iter()
+                    .map(|m| items_text[m.index_in_haystack])
+                    .collect::<Vec<&str>>();
+
+                args.buffer.clone().set_lines(1.., false, matched_items)?;
+
+                let elapsed = time.elapsed();
+                nvim_oxi::print!("elapsed: {elapsed:?}");
 
                 Ok(false)
             })
