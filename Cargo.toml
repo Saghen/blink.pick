@@ -7,4 +7,9 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["neovim-nightly"] }
+crossbeam = "0.8.4"
+frizbee = "0.1.0"
+ignore = { version = "0.4.23", features = ["simd-accel"] }
+lazy_static = "1.5.0"
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["neovim-nightly", "libuv"] }
+tokio = { version = "1.44.1", features = ["full"] }
