@@ -1,45 +1,38 @@
-use layout::Layout;
 use nvim_oxi::api;
 use nvim_oxi::{Dictionary, Function};
+use pickers::test::TestPicker;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Mutex;
 
-mod layout;
-mod view;
+mod list;
+mod picker;
+mod pickers;
+
+use picker::Picker;
 
 #[nvim_oxi::plugin]
 fn blink_pick() -> nvim_oxi::Result<Dictionary> {
-    let layout: Rc<RefCell<Option<Layout>>> = Rc::default();
+    let picker: Rc<RefCell<Option<Picker<TestPicker>>>> = Rc::default();
 
-    let layout_rc = Rc::clone(&layout);
+    let picker_rc = Rc::clone(&picker);
 
     let open_window = Function::from_fn(move |()| {
-        if layout_rc.borrow().is_none() {
-            match Layout::new(api::get_current_win()) {
-                Ok(layout) => {
-                    *layout_rc.borrow_mut() = Some(layout);
+        if picker_rc.borrow().is_none() {
+            match Picker::new(Rc::new(Mutex::new(TestPicker::new()))) {
+                Ok(picker) => {
+                    *picker_rc.borrow_mut() = Some(picker);
                 }
                 Err(err) => {
                     api::err_writeln(&format!("Failed to create layout: {err}"));
-                    return;
                 }
             }
-        }
-
-        if let Err(err) = layout_rc.borrow_mut().as_mut().unwrap().open() {
-            api::err_writeln(&format!("Failed to open window: {err}"));
         }
     });
 
     let close_window = Function::from_fn(move |()| {
-        if layout.borrow().is_none() {
-            api::err_writeln("Window is already closed");
-            return;
-        }
-
-        if let Err(err) = layout.borrow_mut().as_mut().unwrap().close(false) {
-            api::err_writeln(&format!("Failed to close window: {err}"));
-        }
+        let mut picker = picker.borrow_mut();
+        *picker = None;
     });
 
     let api = Dictionary::from_iter([("open_window", open_window), ("close_window", close_window)]);
